@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 import os
 import gzip
+import sys
 from urllib.request import urlopen
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import tinynn
+from tinynn import Dense, DenseBatchNorm, ReLU, Sigmoid, Softmax
 
 
 def download_gzip_file(url, file_name):
@@ -42,7 +44,7 @@ def read_idx(fname):
 
 if __name__ == '__main__':
     os.makedirs('data', exist_ok=True)
-    
+
     # get some data
     root_url = "http://yann.lecun.com/exdb/mnist/"
     names = {"train_images": "train-images-idx3-ubyte",
@@ -57,14 +59,18 @@ if __name__ == '__main__':
     # Read the data
     data = {key: read_idx(fname) for key, fname in fnames.items()}
 
-    # Munge data: flatten and scale X
+    # Flatten features
     X = {}
     for k in ('train', 'test'):
         images = data[k + '_images']
-        images = images.reshape((images.shape[0], -1)).T
-        X[k] = images / images.max(axis=0)
+        X[k] = images.reshape((images.shape[0], -1)).T
 
-    # Munge data: one-hot encode Y
+    # normalize inputs
+    normalize = tinynn.normalizer(X['train'])
+    X['train'] = normalize(X['train'])
+    X['test'] = normalize(X['test'])
+
+    # one-hot encode Y labels
     Y = {}
     for k in ('train', 'test'):
         labels = data[k + '_labels']
@@ -72,10 +78,23 @@ if __name__ == '__main__':
         y[np.arange(labels.size), labels] = 1.0
         Y[k] = y.T
 
+    if len(sys.argv) > 1 and sys.argv[1] == 'gradcheck':
+        print("checking gradient...")
+        X = np.random.rand(10, 10)
+        Y = np.random.rand(3, 10)
+        network = tinynn.Network(DenseBatchNorm(10, 5, active=True), ReLU(),
+                                 DenseBatchNorm(5, 3, active=True), Softmax())
+        network.gradcheck(X, Y)
+        exit()
+
+
+    Xs, Ys = tinynn.partition(X['train'], Y['train'], size=1000)
+
     # Run training
-    network = tinynn.NeuralNetwork([28*28, 100, 10],
-                                   [tinynn.relu, tinynn.sigmoid])
-    network.train(X['train'], Y['train'], niter=300, alpha=0.2)
+    network = tinynn.Network(DenseBatchNorm(28*28, 100), ReLU(),
+                             DenseBatchNorm(100, 10), Softmax())
+    network.train(Xs, Ys, niter=100,
+                  opt_type=tinynn.ADAM, opt_params={'α': 0.0005})
 
     # show training cost
     plt.plot(network.costs)
@@ -85,6 +104,9 @@ if __name__ == '__main__':
     plt.savefig("costs.png")
 
     # Validate
+    for l in network.layers:
+        l.active = False
+
     for key in ('train', 'test'):
         print(key, 'set')
         Ypred = network(X[key])
