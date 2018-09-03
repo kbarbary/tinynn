@@ -1,7 +1,5 @@
 tinynn
 ======
 
-Really minimal implementation of a simple fully-connected deep neural network,
-just for my own education! The implemetation is in `tinynn.py`.
-`run.py` downloads the MNIST handwritten digits dataset and trains a model
-on the data.
+Basic implementation of neural networks implemented with numpy,
+just for my own education. It's just like all the other ones.
