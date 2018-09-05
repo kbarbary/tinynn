@@ -3,23 +3,32 @@ import numpy as np
 __all__ = ["partition", "normalizer", "onehot"]
 
 
-def partition(X, Y, size=256):
+def partition(X, Y, axis=-1, size=256):
     """
-    For 2-d arrays of trailing dimension size ``m``, shuffle along
-    trailing dimension and split dimension into chunks of size ``size``.
+    For ndarrays shuffle along axis and split into chunks of of size ``size``
+    along same axis.
     """
-    m = X.shape[1]
-    assert  Y.shape[1] == m
+    m = X.shape[axis]
+    assert  Y.shape[axis] == m
+    xslices = X.ndim * [slice(None, None)]
+    yslices = Y.ndim * [slice(None, None)]
+
+    # purmute both arrays
     idx = np.random.permutation(m)
-    Xp = X[:, idx]
-    Yp = Y[:, idx]
+    xslices[axis] = idx
+    yslices[axis] = idx
+    Xp = X[xslices]
+    Yp = Y[yslices]
+
     Xs = []
     Ys = []
     start = 0
     while start < m:
         end = min(start+size, m)
-        Xs.append(Xp[:, start:end])
-        Ys.append(Yp[:, start:end])
+        xslices[axis] = slice(start, end)
+        yslices[axis] = slice(start, end)
+        Xs.append(Xp[xslices])
+        Ys.append(Yp[yslices])
         start += size
     return Xs, Ys
 

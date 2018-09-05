@@ -6,14 +6,21 @@ import tqdm
 from .layer import Layer
 from .optimizers import Descent
 from .costs import CrossEntropy
+from .preprocessing import partition
 
 __all__ = ["Network"]
 
+def _identity(x):
+    return x
 
 class Network(object):
-    def __init__(self, *layers):
+    def __init__(self, *layers, x_preprocess=None, y_preprocess=None,
+                 postprocess=None):
         self.layers = layers
         self.costs = []
+        self.x_preprocess = x_preprocess or _identity
+        self.y_preprocess = y_preprocess or _identity
+        self.postprocess = postprocess or _identity
 
     def __call__(self, X):
         for layer in self.layers:
@@ -26,6 +33,10 @@ class Network(object):
         # if X and Y are not batches, make them into batches.
         if not isinstance(X, list):
             X, Y = [X], [Y]
+
+        # Run preprocessing on each batch
+        X = [self.x_preprocess(batch) for batch in X]
+        Y = [self.y_preprocess(batch) for batch in Y]
 
         # Define cost function
         costfn = CrossEntropy()
@@ -67,6 +78,11 @@ class Network(object):
         pbar.close()
 
         return self
+
+def predict(self, X):
+    X = self.x_preprocess(X)
+    Y = self(X)
+    return self.postprocess(Y)
 
 """
     def gradcheck(self, X, Y):

@@ -20,6 +20,7 @@ class Conv(Layer):
         weight_shape = kernel_shape + (n_in, n_out)
         self.W = np.random.normal(scale=np.sqrt(2 / n_in), size=weight_shape)
         self.b = np.zeros((1, 1, 1, n_out))
+        self.param_names = ['W', 'b']
 
     def __call__(self, X):
         """
@@ -66,6 +67,7 @@ class Conv(Layer):
 
         # save input for backprop
         self.X = X
+        return Z
 
     def back(self, dZ):
         m, ny, nx, nc = dZ.shape   # layer output dimensions
@@ -90,9 +92,9 @@ class Conv(Layer):
                         y0 = y * self.stride[0]
                         yslice = slice(y0, y0 + fy)
                         x0 = x * self.stride[1]
-                        xslice = xslice(x0, x0 + fx)
+                        xslice = slice(x0, x0 + fx)
 
-                        dX_pad[i, yslice, xslice, :] += W[:, :, :, c] * dZ[i, y, x, c]
+                        dX_pad[i, yslice, xslice, :] += self.W[:, :, :, c] * dZ[i, y, x, c]
                         dW[:, :, : ,c] += X_pad[i, yslice, xslice, :] * dZ[i, y, x, c]
                         db[:, :, :, c] += dZ[i, y, x, c]
 
@@ -112,6 +114,7 @@ class Pool(Layer):
         if mode not in ('max', 'mean'):
             raise ValueError("mode must be 'max' or 'mean'")
         self.agg = getattr(np, mode)
+        self.param_names = []
 
     def __call__(self, X):
         m, ny_in, nx_in, nc_in = X.shape
@@ -136,6 +139,40 @@ class Pool(Layer):
                         xslice = slice(x_in_min, x_in_min + fx)
 
                         X_slice = X[i, yslice, xslice, c]
-                        A[i, y, x, c] = self.agg(x_slice)
+                        A[i, y, x, c] = self.agg(X_slice)
 
+        self.X = X
+        self.A = A
         return A
+
+    def back(self, dA):
+        m, ny_in, nx_in, nc_in = self.X.shape
+        fy, fx = self.kernel_shape
+
+        # dimensions of output
+        ny = int(1 + (ny_in - fy) / self.stride[0])
+        nx = int(1 + (nx_in - fx) / self.stride[1])
+        nc = nc_in
+
+        # initialize gradient
+        dX = np.zeros_like(self.X)
+
+        # loop over *output*
+        for i in range(m):
+            for y in range(ny):
+                for x in range(nx):
+                    for c in range(nc):
+                        # slice in input volume
+                        y_in_min = y * self.stride[0]
+                        yslice = slice(y_in_min, y_in_min + fy)
+                        x_in_min = x * self.stride[1]
+                        xslice = slice(x_in_min, x_in_min + fx)
+
+                        a = self.A[i, y, x, c]  # output value
+                        da = dA[i, y, x, c]
+                        if self.agg is np.max:
+                            mask = self.X[i, yslice, xslice, c] == a
+                            dX[i, yslice, xslice, c] += da / mask.sum() * mask
+                        elif self.agg is np.mean:
+                            dX[i, yslice, xslice, c] += da / (fx * fy)
+        return dX

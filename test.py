@@ -15,7 +15,7 @@ def ngradient(f, v):
         y1 = f()
         v.flat[i] = tmp + δ/2
         y2 = f()
-        g.flat[i] = (y2 - y1) / δ
+        g.flat[i] += (y2 - y1) / δ
         v.flat[i] = tmp
     return g
 
@@ -30,7 +30,7 @@ class SumSine(tinynn.Layer):
         return dA * np.cos(self.X)
 
 
-def gradcheck(layer, X):
+def gradcheck(layer, X, verbose=False):
     """
     Check that the layer's numerical gradients match exact gradients for
     input X and the layer parameters.
@@ -53,13 +53,14 @@ def gradcheck(layer, X):
 
     for key in exact:
         ok = np.allclose(exact[key], approx[key], rtol=1e-5, atol=1e-5)
-        if not ok:
-            print(layer, name)
+        if not ok or verbose:
+            print(layer, key)
             print("exact:")
-            print(exactg)
-            print("numeric:")
-            print(g)
-            raise AssertionError("exact and numeric gradients to not match")
+            print(exact[key])
+            print("approx:")
+            print(approx[key])
+        if not ok:
+            raise AssertionError("exact and numeric gradients do not match")
 
 
 def test_densebatchnorm():
@@ -69,3 +70,14 @@ def test_densebatchnorm():
 
     layer = tinynn.DenseBatchNorm(10, 5, active=False)
     gradcheck(layer, X)
+
+
+def test_conv():
+    X = np.random.rand(3, 10, 10, 3)
+    layer = tinynn.Conv(3, 5, (3, 3), stride=(1, 1))
+    gradcheck(layer, X)
+
+def test_pool():
+    X = np.random.rand(2, 5, 5, 2)
+    layer = tinynn.Pool((2, 2), stride=(1, 1))
+    gradcheck(layer, X, verbose=True)
