@@ -79,10 +79,10 @@ class Network(object):
 
         return self
 
-def predict(self, X):
-    X = self.x_preprocess(X)
-    Y = self(X)
-    return self.postprocess(Y)
+    def predict(self, X):
+        X = self.x_preprocess(X)
+        Y = self(X)
+        return self.postprocess(Y)
 
 """
     def gradcheck(self, X, Y):

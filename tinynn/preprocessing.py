@@ -33,19 +33,24 @@ def partition(X, Y, axis=-1, size=256):
     return Xs, Ys
 
 
-def normalizer(X):
+def normalizer(X, axis=0):
     """
-    Return a function that would normalize the array X along axis=1.
+    Return a function that would normalize the array X along an axis.
 
     Parameters
     ----------
     X : ndarray
-        An array of shape `(n_features, n_examples)`. The returned function
+        The returned function
         makes the mean of each feature (column) zero and the standard
         deviation of each feature (column) one.
+    axis : int or tuple of ints, optional
+        Axis along which to normalize. Default is 0.
+    Returns
+    -------
+    function
     """
-    mu = np.mean(X, axis=1, keepdims=True)
-    sig = np.sqrt(np.var(X, axis=1, keepdims=True) + 1e-8)
+    mu = np.mean(X, axis=axis, keepdims=True)
+    sig = np.sqrt(np.var(X, axis=axis, keepdims=True) + 1e-8)
     return lambda X: (X - mu) / sig
 
 
