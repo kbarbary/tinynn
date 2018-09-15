@@ -3,7 +3,7 @@ import numpy as np
 __all__ = ["partition", "normalizer", "onehot"]
 
 
-def partition(X, Y, axis=-1, size=256):
+def partition(X, Y, axis=0, size=256):
     """
     For ndarrays shuffle along axis and split into chunks of of size ``size``
     along same axis.
@@ -57,7 +57,11 @@ def normalizer(X, axis=0):
 def onehot(x, dtype=float):
     """
     One-hot encode a 1-d array of non-negative integers.
+
+    Returns
+    -------
+    numpy.ndarray shape (x.size, x.max()+1)
     """
     out = np.zeros((x.size, x.max() + 1), dtype=dtype)
     out[np.arange(x.size), x] = 1
-    return out.T
+    return out

@@ -3,7 +3,7 @@ import numpy as np
 
 from .layer import Layer
 
-__all__ = ["Conv", "Pool"]
+__all__ = ["Conv", "Pool", "Flatten", "Transpose"]
 
 
 class Conv(Layer):
@@ -51,19 +51,19 @@ class Conv(Layer):
         # loop over output volume
         for i in range(m):  # loop over batch of training examples
             for y in range(ny):
+                # y slice in input volume
+                y_in_min = y * self.stride[0]
+                yslice = slice(y_in_min, y_in_min + fy)
                 for x in range(nx):
-                    for c in range(nc):
-                        # slice in input volume
-                        y_in_min = y * self.stride[0]
-                        y_in_max = y_in_min + fy
-                        x_in_min = x * self.stride[1]
-                        x_in_max = x_in_min + fx
-
-                        # 3-d slice of input volume to be convolved
-                        x_slice = X_pad[i, y_in_min:y_in_max, x_in_min:x_in_max, :]
-
-                        # convolve
-                        Z[i, y, x, c] = np.sum(x_slice * self.W[:, :, :, c]) + self.b[0, 0, 0, c]
+                    # x slice in input volume
+                    x_in_min = x * self.stride[1]
+                    xslice = slice(x_in_min, x_in_min + fx)
+                    
+                    # 3-d slice of input volume to be convolved
+                    # but add a length-1 dimension to the end
+                    # making it 4-d
+                    X_slice = X_pad[i, yslice, xslice, :, None]
+                    Z[i, y, x, :] = np.sum(X_slice * self.W, axis=(0, 1, 2)) + self.b[0, 0, 0, :]
 
         # save input for backprop
         self.X = X
@@ -176,3 +176,30 @@ class Pool(Layer):
                         elif self.agg is np.mean:
                             dX[i, yslice, xslice, c] += da / (fx * fy)
         return dX
+
+
+class Flatten(Layer):
+    """For a input of shape (m, n1, n2, ...) transform to
+    (m, n1*n2*...)."""
+    def __init__(self, keepdim='first'):
+        if keepdim not in ('first', 'last'):
+            raise ValueError("keepdim must be 'first' or 'last'.")
+        self.keepdim = keepdim
+        self.param_names = []
+
+    def __call__(self, X):
+        if self.keepdim == 'first':
+            return X.reshape((X.shape[0], -1))
+        elif self.keepdim == 'last':
+            return X.reshape((-1, X.shape[-1]))
+        self.in_shape = X.shape
+
+    def back(self, dA):
+        dA.reshape(self.in_shape)
+
+
+class Transpose(Layer):
+    def __call__(self, X):
+        return X.T
+    def back(self, dA):
+        return dA.T
